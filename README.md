@@ -63,9 +63,26 @@ Photon/
 | 項目 | 値 |
 |------|-----|
 | ベースモデル | Qwen/Qwen3-1.7B |
-| 学習方式 | LoRA (Unsloth) |
-| コンテキスト長 | 32,768 |
+| 学習方式 | LoRA (PEFT) |
+| LoRA Rank | 64 |
+| コンテキスト長 | 4,096 |
 | 量子化 | Q5_K_M (日本語Imatrix) |
+
+## 学習結果 (v1)
+
+| 項目 | 値 |
+|------|-----|
+| 学習時間 | 32.7分 |
+| GPU | NVIDIA A100-SXM4-40GB |
+| コスト | $0.70 |
+| 最終Loss | 1.25 |
+| Epochs | 2 |
+| バッチサイズ | 2 (accumulation: 8) |
+| 学習率 | 2e-5 |
+
+## HuggingFace
+
+- LoRAアダプター: `yukihamada/Photon-1.7B-Instruct-v1`
 
 ## ライセンス
 
