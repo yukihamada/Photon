@@ -1,0 +1,203 @@
+name: Train Photon Model
+
+on:
+  push:
+    paths:
+      - 'data/**/*.jsonl'
+  workflow_dispatch:
+    inputs:
+      epochs:
+        description: 'Number of training epochs'
+        required: false
+        default: '2'
+
+env:
+  MODEL_NAME: Photon-1.7B-Instruct
+  HF_REPO: yukihamada/Photon-1.7B-Instruct-v1
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install requests python-dotenv huggingface_hub
+
+      - name: Launch Lambda Labs Instance
+        id: launch
+        env:
+          LAMBDA_API_KEY: ${{ secrets.LAMBDA_API_KEY }}
+        run: |
+          python << 'EOF'
+          import requests
+          import os
+          import time
+          import json
+
+          API_KEY = os.environ["LAMBDA_API_KEY"]
+          headers = {"Authorization": f"Bearer {API_KEY}"}
+
+          # Find available instance type
+          print("Checking available instances...")
+          r = requests.get("https://cloud.lambdalabs.com/api/v1/instance-types", headers=headers)
+          types = r.json().get("data", {})
+
+          # Prefer A100
+          preferred = ["gpu_1x_a100_sxm4", "gpu_1x_a100", "gpu_1x_h100_pcie"]
+          instance_type = None
+          region = None
+
+          for pref in preferred:
+              if pref in types:
+                  regions = types[pref].get("regions_with_capacity_available", [])
+                  if regions:
+                      instance_type = pref
+                      region = regions[0]["name"]
+                      break
+
+          if not instance_type:
+              print("No GPU instances available")
+              exit(1)
+
+          print(f"Launching {instance_type} in {region}")
+
+          # Launch
+          payload = {
+              "region_name": region,
+              "instance_type_name": instance_type,
+              "name": "photon-github-actions",
+              "ssh_key_names": ["github-actions"]
+          }
+
+          r = requests.post(
+              "https://cloud.lambdalabs.com/api/v1/instance-operations/launch",
+              headers=headers,
+              json=payload
+          )
+
+          if r.status_code != 200:
+              print(f"Launch failed: {r.text}")
+              exit(1)
+
+          instance_id = r.json()["data"]["instance_ids"][0]
+          print(f"Instance ID: {instance_id}")
+
+          # Wait for IP
+          for _ in range(30):
+              time.sleep(10)
+              r = requests.get("https://cloud.lambdalabs.com/api/v1/instances", headers=headers)
+              for inst in r.json().get("data", []):
+                  if inst["id"] == instance_id and inst.get("ip"):
+                      ip = inst["ip"]
+                      print(f"IP: {ip}")
+                      with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                          f.write(f"instance_id={instance_id}\n")
+                          f.write(f"ip={ip}\n")
+                      exit(0)
+
+          print("Timeout waiting for IP")
+          exit(1)
+          EOF
+
+      - name: Setup SSH Key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.LAMBDA_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/lambda_key
+          chmod 600 ~/.ssh/lambda_key
+          echo "StrictHostKeyChecking no" >> ~/.ssh/config
+
+      - name: Wait for SSH
+        run: |
+          for i in {1..30}; do
+            if ssh -i ~/.ssh/lambda_key -o ConnectTimeout=10 ubuntu@${{ steps.launch.outputs.ip }} "echo OK" 2>/dev/null; then
+              echo "SSH ready"
+              exit 0
+            fi
+            echo "Waiting for SSH... ($i/30)"
+            sleep 10
+          done
+          echo "SSH timeout"
+          exit 1
+
+      - name: Run Training
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          ssh -i ~/.ssh/lambda_key ubuntu@${{ steps.launch.outputs.ip }} << 'ENDSSH'
+          set -e
+
+          # Clone repo
+          git clone https://github.com/${{ github.repository }}.git repo
+          cd repo
+
+          # Setup venv
+          python3 -m venv ~/venv
+          source ~/venv/bin/activate
+          pip install --upgrade pip
+          pip install torch transformers accelerate peft datasets sentencepiece huggingface_hub
+
+          # Train
+          python scripts/train_simple.py
+
+          # Upload to HuggingFace
+          pip install huggingface_hub
+          python << EOF
+          from huggingface_hub import HfApi, login
+          import os
+
+          login(token="${{ secrets.HF_TOKEN }}")
+          api = HfApi()
+          api.upload_folder(
+              folder_path="outputs/Photon-1.7B-Instruct-v1",
+              repo_id="${{ env.HF_REPO }}",
+              repo_type="model",
+          )
+          print("Upload complete!")
+          EOF
+          ENDSSH
+
+      - name: Get Training Info
+        id: training_info
+        run: |
+          ssh -i ~/.ssh/lambda_key ubuntu@${{ steps.launch.outputs.ip }} "cat repo/outputs/Photon-1.7B-Instruct-v1/training_info.json" > training_info.json
+          cat training_info.json
+
+      - name: Terminate Instance
+        if: always()
+        env:
+          LAMBDA_API_KEY: ${{ secrets.LAMBDA_API_KEY }}
+        run: |
+          python << EOF
+          import requests
+          import os
+
+          API_KEY = os.environ["LAMBDA_API_KEY"]
+          instance_id = "${{ steps.launch.outputs.instance_id }}"
+
+          if instance_id:
+              r = requests.post(
+                  "https://cloud.lambdalabs.com/api/v1/instance-operations/terminate",
+                  headers={"Authorization": f"Bearer {API_KEY}"},
+                  json={"instance_ids": [instance_id]}
+              )
+              print(f"Terminate: {r.status_code}")
+          EOF
+
+      - name: Update README with results
+        run: |
+          if [ -f training_info.json ]; then
+            echo "Training completed successfully"
+            cat training_info.json
+          fi
