@@ -101,9 +101,8 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
         torch_dtype=torch.bfloat16,
-        device_map="auto",
         trust_remote_code=True,
-    )
+    ).cuda()
 
     # Add LoRA adapters
     print("\nConfiguring LoRA...")
@@ -119,6 +118,7 @@ def main():
         task_type=TaskType.CAUSAL_LM,
     )
     model = get_peft_model(model, lora_config)
+    model.enable_input_require_grads()  # Required for gradient checkpointing
     model.print_trainable_parameters()
 
     # Load data
@@ -144,6 +144,7 @@ def main():
         report_to="none",
         seed=42,
         gradient_checkpointing=True,
+        gradient_checkpointing_kwargs={"use_reentrant": False},
     )
 
     # Create trainer
