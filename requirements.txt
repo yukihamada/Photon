@@ -1,0 +1,27 @@
+# Core ML libraries
+torch>=2.1.0
+transformers>=4.40.0
+accelerate>=0.27.0
+datasets>=2.18.0
+
+# LoRA / PEFT
+peft>=0.10.0
+
+# Training utilities
+bitsandbytes>=0.43.0
+trl>=0.8.0
+wandb>=0.16.0
+
+# Data processing
+pandas>=2.0.0
+tqdm>=4.66.0
+
+# Inference
+sentencepiece>=0.2.0
+
+# HuggingFace Hub
+huggingface_hub>=0.21.0
+
+# Utilities
+python-dotenv>=1.0.0
+requests>=2.31.0

@@ -1,0 +1,32 @@
+# ElioChat-1.7B-JP v2 学習設定 (8x B200/H100用)
+
+model:
+  base_model: "Qwen/Qwen3-1.7B"
+  use_4bit: false  # マルチGPUではfull precision
+
+lora:
+  r: 64
+  alpha: 128
+  dropout: 0.05
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+training:
+  num_epochs: 3
+  batch_size: 8           # B200は大きいバッチ可能
+  gradient_accumulation_steps: 2
+  learning_rate: 2.0e-4
+  weight_decay: 0.01
+  warmup_ratio: 0.03
+  max_seq_length: 2048
+  use_wandb: false
+
+output:
+  model_name: "ElioChat-1.7B-JP-v2"
+  save_dir: "outputs"

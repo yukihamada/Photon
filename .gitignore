@@ -1,0 +1,40 @@
+# Environment variables (NEVER commit!)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Model outputs
+outputs/
+*.bin
+*.safetensors
+*.gguf
+
+# Large old merged data (exclude to reduce repo size)
+data/eliochat_train_30k*.jsonl
+data/eliochat_final.jsonl
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+wandb/
+
+# HuggingFace cache
+.cache/

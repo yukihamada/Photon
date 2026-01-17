@@ -1,0 +1,32 @@
+# ElioChat-1.7B-JP 学習設定
+
+model:
+  base_model: "Qwen/Qwen3-1.7B"
+  use_4bit: false  # GH200ではfull precision使用
+
+lora:
+  r: 64                # LoRAのrank
+  alpha: 128           # LoRAのalpha（通常はrの2倍）
+  dropout: 0.05        # Dropout率
+  target_modules:      # LoRAを適用するモジュール
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+training:
+  num_epochs: 3
+  batch_size: 4
+  gradient_accumulation_steps: 4  # 実効バッチサイズ: 4 * 4 = 16
+  learning_rate: 2.0e-4
+  weight_decay: 0.01
+  warmup_ratio: 0.03
+  max_seq_length: 2048
+  use_wandb: false  # Weights & Biasesでログを取る場合はtrueに
+
+output:
+  model_name: "ElioChat-1.7B-JP"
+  save_dir: "outputs"
