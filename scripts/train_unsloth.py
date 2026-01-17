@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unsloth training script for ElioChat-1.7B-Think-JP
+Unsloth training script for Photon-1.7B (Instruct-v1)
 Optimized for Lambda Labs A100 80GB
 """
 import os
@@ -24,8 +24,8 @@ from trl import SFTTrainer
 
 # Configuration
 MODEL_NAME = "Qwen/Qwen3-1.7B"
-OUTPUT_DIR = "./outputs/ElioChat-1.7B-Think-JP"
-DATA_PATH = "./data/eliochat_train_30k_train.jsonl"
+OUTPUT_DIR = "./outputs/Photon-1.7B-Instruct-v1"
+DATA_PATH = "./data/eliochat_v3_merged.jsonl"
 
 # Training hyperparameters
 MAX_SEQ_LENGTH = 32768  # 32k context
@@ -69,7 +69,7 @@ def load_training_data(path: str) -> Dataset:
 
 def main():
     print("="*60)
-    print("ElioChat-1.7B-Think-JP Training")
+    print("Photon-1.7B (Instruct-v1) Training")
     print("="*60)
 
     # Check GPU
